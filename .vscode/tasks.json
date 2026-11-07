@@ -1,0 +1,223 @@
+{
+    "version": "2.0.0",
+    "options": {
+        "cwd": "${workspaceFolder}"
+    },
+    "inputs": [
+        {
+            "id": "r128Input",
+            "type": "promptString",
+            "description": "R128 Input value (порт IN)",
+            "default": "0"
+        },
+        {
+            "id": "memLatency",
+            "type": "promptString",
+            "description": "Memory latency (тактов)",
+            "default": "1"
+        },
+        {
+            "id": "maxCycles",
+            "type": "promptString",
+            "description": "Max cycles",
+            "default": "200000"
+        }
+    ],
+    "tasks": [
+        {
+            "label": "Assemble (current .asm)",
+            "type": "shell",
+            "command": "python3",
+            "args": [
+                "${workspaceFolder}/asm/asm.py",
+                "${file}",
+                "-o",
+                "${fileDirname}/${fileBasenameNoExtension}.bin",
+                "--listing",
+                "${fileDirname}/${fileBasenameNoExtension}.lst"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Assemble (prog.asm)",
+            "type": "shell",
+            "command": "python3",
+            "args": [
+                "${workspaceFolder}/asm/asm.py",
+                "${workspaceFolder}/asm/programs/prog.asm",
+                "-o",
+                "${workspaceFolder}/asm/programs/prog.bin",
+                "--listing",
+                "${workspaceFolder}/asm/programs/prog.lst"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Build Runner (Verilator)",
+            "type": "shell",
+            "command": "mkdir -p out && verilator --cc --trace --exe --build -j 0 -Mdir out/obj_dir -o r128_runner ${workspaceFolder}/asm/runner.cpp $(find rtl -name '*.sv' | sort) --top-module main && cp -f out/obj_dir/r128_runner out/r128_runner",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "/bin/bash",
+                    "args": ["-c"]
+                }
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "group": "build"
+        },
+        {
+            "label": "Run Program (current .bin / .asm)",
+            "type": "shell",
+            "command": "BIN=\"${fileDirname}/${fileBasenameNoExtension}.bin\"; if [ ! -f \"$BIN\" ]; then echo \"BIN not found: $BIN\"; echo \"Сначала запустите задачу Assemble\"; exit 1; fi; if [ ! -x out/r128_runner ] && [ ! -x out/obj_dir/r128_runner ]; then echo \"Runner не собран. Запустите Build Runner\"; exit 1; fi; RUNNER=out/r128_runner; [ -x \"$RUNNER\" ] || RUNNER=out/obj_dir/r128_runner; \"$RUNNER\" \"$BIN\" --input ${input:r128Input} --latency ${input:memLatency} --max-cycles ${input:maxCycles}",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "/bin/bash",
+                    "args": ["-c"]
+                }
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "Assemble & Run (current .asm)",
+            "type": "shell",
+            "command": "python3 asm/asm.py \"${file}\" -o \"${fileDirname}/${fileBasenameNoExtension}.bin\" --listing \"${fileDirname}/${fileBasenameNoExtension}.lst\" && BIN=\"${fileDirname}/${fileBasenameNoExtension}.bin\" && RUNNER=out/r128_runner && [ -x \"$RUNNER\" ] || RUNNER=out/obj_dir/r128_runner && if [ ! -x \"$RUNNER\" ]; then echo \"Runner не собран. Сначала Build Runner (Verilator)\"; exit 1; fi && \"$RUNNER\" \"$BIN\" --input ${input:r128Input} --latency ${input:memLatency} --max-cycles ${input:maxCycles}",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "/bin/bash",
+                    "args": ["-c"]
+                }
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            },
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Open Waveform (current program)",
+            "type": "shell",
+            "command": "VCD=\"${fileDirname}/${fileBasenameNoExtension}.vcd\"; if [ ! -f \"$VCD\" ]; then echo \"VCD не найден: $VCD\"; echo \"Сначала запустите программу (Run Program / Assemble & Run)\"; exit 1; fi; if command -v surfer >/dev/null 2>&1; then surfer \"$VCD\"; elif command -v gtkwave >/dev/null 2>&1; then gtkwave \"$VCD\"; else echo \"Не найден surfer или gtkwave\"; open \"$VCD\" 2>/dev/null || xdg-open \"$VCD\" 2>/dev/null || echo \"Откройте $VCD вручную\"; fi",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "/bin/bash",
+                    "args": ["-c"]
+                }
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Build (Verilator full testbench)",
+            "type": "shell",
+            "command": "mkdir -p out && verilator --cc --trace --exe --build -j 0 -Mdir out/obj_dir -o Vmain tb/test__.cpp $(find rtl -name '*.sv' | sort) --top-module main",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "/bin/bash",
+                    "args": ["-c"]
+                }
+            },
+            "problemMatcher": [],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Run Simulation (full testbench)",
+            "type": "shell",
+            "command": "./out/obj_dir/Vmain",
+            "dependsOn": "Build (Verilator full testbench)",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Open Waveform (testbench VCD)",
+            "type": "shell",
+            "command": "if command -v surfer >/dev/null 2>&1; then surfer out/r128.vcd; elif command -v gtkwave >/dev/null 2>&1; then gtkwave out/r128.vcd; else echo \"Не найден surfer/gtkwave\"; fi",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "/bin/bash",
+                    "args": ["-c"]
+                }
+            },
+            "dependsOn": "Run Simulation (full testbench)",
+            "problemMatcher": []
+        },
+        {
+            "label": "Synthesis (Yosys)",
+            "type": "shell",
+            "command": "mkdir -p out && files=$(find rtl -type f -name '*.sv' | sort | tr '\\n' ' ') && yosys -m slang -p \"read_slang --top main $files; synth -top main; write_json out/main.json\"",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "/bin/bash",
+                    "args": ["-c"]
+                }
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Graphviz (R128: Simple schematic)",
+            "type": "shell",
+            "command": "mkdir -p out/graphviz && files=$(find rtl -type f -name '*.sv' | sort | tr '\\n' ' ') && yosys -m slang -p \"read_slang --top main $files; prep -top main; show -format dot -prefix out/graphviz/r128 main\" && dot -Tsvg -Gsplines=line -Grankdir=LR -Goverlap=false out/graphviz/r128.dot -o out/graphviz/r128.svg",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "/bin/bash",
+                    "args": ["-c"]
+                }
+            },
+            "problemMatcher": []
+        }
+    ]
+}
